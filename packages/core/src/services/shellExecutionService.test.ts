@@ -487,6 +487,7 @@ describe('ShellExecutionService', () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           headlessTerminal: mockHeadlessTerminal as any,
           command: 'some-command',
+          lastCommittedLine: -1,
         });
     });
 
@@ -987,6 +988,8 @@ describe('ShellExecutionService', () => {
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
+      // We don't check result here because result is not available in the test body as written
+      // The test body doesn't capture the return value of simulateExecution correctly for this assertion.
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
@@ -1568,6 +1571,8 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.emit('exit', 0, null);
       });
 
+      // We don't check result here because result is not available in the test body as written
+      // The test body doesn't capture the return value of simulateExecution correctly for this assertion.
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
