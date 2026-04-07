@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 195
+  // Next ID: 201
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -725,4 +725,26 @@ export enum EventMetadataKey {
 
   // Logs the duration of the onboarding process in milliseconds.
   GEMINI_CLI_ONBOARDING_DURATION_MS = 194,
+
+  // ==========================================================================
+  // Memory Extraction Event Keys
+  // ==========================================================================
+
+  // Logs whether the memory extraction succeeded.
+  GEMINI_CLI_MEMORY_EXTRACTION_SUCCESS = 195,
+
+  // Logs the duration of the memory extraction LLM call in milliseconds.
+  GEMINI_CLI_MEMORY_EXTRACTION_DURATION_MS = 196,
+
+  // Logs the number of messages in the session being extracted.
+  GEMINI_CLI_MEMORY_EXTRACTION_MESSAGE_COUNT = 197,
+
+  // Logs the character length of the generated scratchpad.
+  GEMINI_CLI_MEMORY_EXTRACTION_SCRATCHPAD_LENGTH = 198,
+
+  // Logs whether the extraction fell back to simple summary.
+  GEMINI_CLI_MEMORY_EXTRACTION_FALLBACK = 199,
+
+  // Logs the reason memory extraction was skipped.
+  GEMINI_CLI_MEMORY_EXTRACTION_SKIP_REASON = 200,
 }
