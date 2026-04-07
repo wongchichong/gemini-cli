@@ -1148,7 +1148,8 @@ export class ShellExecutionService {
 
       let lastYdisp = 0;
       let hasReachedMax = false;
-      const scrollbackLimit = shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
+      const scrollbackLimit =
+        shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
 
       headlessTerminal.onScroll((ydisp) => {
         if (!isWriting) {
