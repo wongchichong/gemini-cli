@@ -31,27 +31,74 @@ const TRACER_VERSION = 'v1';
 
 export function truncateForTelemetry(
   value: unknown,
-  maxLength: number = 10000,
+  maxStringLength: number = 10000,
+  maxArrayLength: number = 100,
+  maxDepth: number = 4,
 ): AttributeValue | undefined {
-  if (typeof value === 'string') {
-    return truncateString(
-      value,
-      maxLength,
-      `...[TRUNCATED: original length ${value.length}]`,
-    );
+  const truncateObj = (v: unknown, depth: number): unknown => {
+    if (typeof v === 'string') {
+      if (v.length > maxStringLength) {
+        return truncateString(
+          v,
+          maxStringLength,
+          `...[TRUNCATED: original length ${v.length}]`,
+        );
+      }
+      return v;
+    }
+    if (
+      typeof v === 'number' ||
+      typeof v === 'boolean' ||
+      v === null ||
+      v === undefined
+    ) {
+      return v;
+    }
+    if (typeof v === 'object') {
+      if (depth >= maxDepth) {
+        return `[TRUNCATED: Max Depth Reached]`;
+      }
+      if (Array.isArray(v)) {
+        if (v.length > maxArrayLength) {
+          const truncatedArray = v
+            .slice(0, maxArrayLength)
+            .map((item) => truncateObj(item, depth + 1));
+          truncatedArray.push(`[TRUNCATED: Array of length ${v.length}]`);
+          return truncatedArray;
+        }
+        return v.map((item) => truncateObj(item, depth + 1));
+      }
+
+      const newObj: Record<string, unknown> = {};
+      let numKeys = 0;
+      const MAX_KEYS = 100;
+      for (const [key, val] of Object.entries(v)) {
+        if (numKeys >= MAX_KEYS) {
+          newObj['__truncated'] = `[TRUNCATED: Object with >${MAX_KEYS} keys]`;
+          break;
+        }
+        newObj[key] = truncateObj(val, depth + 1);
+        numKeys++;
+      }
+      return newObj;
+    }
+    return undefined;
+  };
+
+  const truncated = truncateObj(value, 0);
+
+  if (
+    typeof truncated === 'string' ||
+    typeof truncated === 'number' ||
+    typeof truncated === 'boolean'
+  ) {
+    return truncated;
   }
-  if (typeof value === 'object' && value !== null) {
-    const stringified = safeJsonStringify(value);
-    return truncateString(
-      stringified,
-      maxLength,
-      `...[TRUNCATED: original length ${stringified.length}]`,
-    );
+  if (truncated === null || truncated === undefined) {
+    return undefined;
   }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-  return undefined;
+
+  return safeJsonStringify(truncated);
 }
 
 function isAsyncIterable<T>(value: T): value is T & AsyncIterable<unknown> {
@@ -99,10 +146,25 @@ export async function runInDevTraceSpan<R>(
     operation: GeminiCliOperation;
     logPrompts?: boolean;
     sessionId: string;
+    tracesEnabled?: boolean;
   },
   fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const { operation, logPrompts, sessionId, ...restOfSpanOpts } = opts;
+  const { operation, logPrompts, sessionId, tracesEnabled, ...restOfSpanOpts } =
+    opts;
+
+  if (tracesEnabled === false) {
+    const meta: SpanMetadata = {
+      name: operation,
+      attributes: {
+        [GEN_AI_OPERATION_NAME]: operation,
+        [GEN_AI_AGENT_NAME]: SERVICE_NAME,
+        [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
+        [GEN_AI_CONVERSATION_ID]: sessionId,
+      },
+    };
+    return fn({ metadata: meta });
+  }
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
