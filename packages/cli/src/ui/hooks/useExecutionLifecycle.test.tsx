@@ -149,6 +149,7 @@ describe('useExecutionLifecycle', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getSessionId: () => 'test-session-id',
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
@@ -277,9 +278,30 @@ describe('useExecutionLifecycle', () => {
       expect.any(Function),
       expect.any(Object),
       false,
-      expect.any(Object),
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
+  });
+
+  it('should pass the config sessionId into shell execution config', async () => {
+    const { result } = await renderProcessorHook();
+
+    await act(async () => {
+      result.current.handleShellCommand('top', new AbortController().signal);
+    });
+
+    expect(mockShellExecutionService).toHaveBeenCalledWith(
+      expect.any(String),
+      '/test/dir',
+      expect.any(Function),
+      expect.any(Object),
+      false,
+      expect.objectContaining({
+        sessionId: 'test-session-id',
+      }),
+    );
   });
 
   it('should handle successful execution and update history correctly', async () => {
