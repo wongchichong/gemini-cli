@@ -24,8 +24,6 @@ import {
   SERVICE_NAME,
 } from './constants.js';
 
-import { truncateString } from '../utils/textUtils.js';
-
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
 
@@ -37,11 +35,11 @@ export function truncateForTelemetry(
 ): AttributeValue | undefined {
   const truncateObj = (v: unknown, depth: number): unknown => {
     if (typeof v === 'string') {
-      if (v.length > maxStringLength) {
-        return truncateString(
-          v,
-          maxStringLength,
-          `...[TRUNCATED: original length ${v.length}]`,
+      const graphemes = Array.from(v);
+      if (graphemes.length > maxStringLength) {
+        return (
+          graphemes.slice(0, maxStringLength).join('') +
+          `...[TRUNCATED: original length ${graphemes.length}]`
         );
       }
       return v;
@@ -72,12 +70,16 @@ export function truncateForTelemetry(
       const newObj: Record<string, unknown> = {};
       let numKeys = 0;
       const MAX_KEYS = 100;
-      for (const [key, val] of Object.entries(v)) {
+      for (const key in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, key)) continue;
         if (numKeys >= MAX_KEYS) {
           newObj['__truncated'] = `[TRUNCATED: Object with >${MAX_KEYS} keys]`;
           break;
         }
-        newObj[key] = truncateObj(val, depth + 1);
+        const descriptor = Object.getOwnPropertyDescriptor(v, key);
+        if (descriptor) {
+          newObj[key] = truncateObj(descriptor.value, depth + 1);
+        }
         numKeys++;
       }
       return newObj;
@@ -166,91 +168,103 @@ export async function runInDevTraceSpan<R>(
     return fn({ metadata: meta });
   }
 
+  const spanOptsWithSession: SpanOptions = {
+    ...restOfSpanOpts,
+    attributes: {
+      ...restOfSpanOpts.attributes,
+      [GEN_AI_CONVERSATION_ID]: sessionId,
+    },
+  };
+
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
-  return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
-    const meta: SpanMetadata = {
-      name: operation,
-      attributes: {
-        [GEN_AI_OPERATION_NAME]: operation,
-        [GEN_AI_AGENT_NAME]: SERVICE_NAME,
-        [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
-        [GEN_AI_CONVERSATION_ID]: sessionId,
-      },
-    };
-    const endSpan = () => {
-      try {
-        if (logPrompts !== false) {
-          if (meta.input !== undefined) {
-            const truncated = truncateForTelemetry(meta.input);
-            if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+  return tracer.startActiveSpan(
+    operation,
+    spanOptsWithSession,
+    async (span) => {
+      const meta: SpanMetadata = {
+        name: operation,
+        attributes: {
+          [GEN_AI_OPERATION_NAME]: operation,
+          [GEN_AI_AGENT_NAME]: SERVICE_NAME,
+          [GEN_AI_AGENT_DESCRIPTION]: SERVICE_DESCRIPTION,
+          [GEN_AI_CONVERSATION_ID]: sessionId,
+        },
+      };
+      const endSpan = () => {
+        try {
+          if (logPrompts !== false) {
+            if (meta.input !== undefined) {
+              const truncated = truncateForTelemetry(meta.input);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+              }
+            }
+            if (meta.output !== undefined) {
+              const truncated = truncateForTelemetry(meta.output);
+              if (truncated !== undefined) {
+                span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              }
             }
           }
-          if (meta.output !== undefined) {
-            const truncated = truncateForTelemetry(meta.output);
+          for (const [key, value] of Object.entries(meta.attributes)) {
+            const truncated = truncateForTelemetry(value);
             if (truncated !== undefined) {
-              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+              span.setAttribute(key, truncated);
             }
           }
-        }
-        for (const [key, value] of Object.entries(meta.attributes)) {
-          const truncated = truncateForTelemetry(value);
-          if (truncated !== undefined) {
-            span.setAttribute(key, truncated);
+          if (meta.error) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: getErrorMessage(meta.error),
+            });
+            if (meta.error instanceof Error) {
+              span.recordException(meta.error);
+            }
+          } else {
+            span.setStatus({ code: SpanStatusCode.OK });
           }
-        }
-        if (meta.error) {
+        } catch (e) {
+          // Log the error but don't rethrow, to ensure span.end() is called.
+          diag.error('Error setting span attributes in endSpan', e);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: getErrorMessage(meta.error),
+            message: `Error in endSpan: ${getErrorMessage(e)}`,
           });
-          if (meta.error instanceof Error) {
-            span.recordException(meta.error);
-          }
-        } else {
-          span.setStatus({ code: SpanStatusCode.OK });
+        } finally {
+          span.end();
         }
+      };
+
+      let isStream = false;
+      try {
+        const result = await fn({ metadata: meta });
+
+        if (isAsyncIterable(result)) {
+          isStream = true;
+          const streamWrapper = (async function* () {
+            try {
+              yield* result;
+            } catch (e) {
+              meta.error = e;
+              throw e;
+            } finally {
+              endSpan();
+            }
+          })();
+
+          return Object.assign(streamWrapper, result);
+        }
+        return result;
       } catch (e) {
-        // Log the error but don't rethrow, to ensure span.end() is called.
-        diag.error('Error setting span attributes in endSpan', e);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: `Error in endSpan: ${getErrorMessage(e)}`,
-        });
+        meta.error = e;
+        throw e;
       } finally {
-        span.end();
+        if (!isStream) {
+          endSpan();
+        }
       }
-    };
-
-    let isStream = false;
-    try {
-      const result = await fn({ metadata: meta });
-
-      if (isAsyncIterable(result)) {
-        isStream = true;
-        const streamWrapper = (async function* () {
-          try {
-            yield* result;
-          } catch (e) {
-            meta.error = e;
-            throw e;
-          } finally {
-            endSpan();
-          }
-        })();
-
-        return Object.assign(streamWrapper, result);
-      }
-      return result;
-    } catch (e) {
-      meta.error = e;
-      throw e;
-    } finally {
-      if (!isStream) {
-        endSpan();
-      }
-    }
-  });
+    },
+  );
 }
 
 /**
