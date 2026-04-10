@@ -373,7 +373,6 @@ export class ShellExecutionService {
     const outputFilePath = path.join(os.tmpdir(), outputFileName);
     const outputStream = fs.createWriteStream(outputFilePath);
 
-    let isBinaryStream = false;
     let totalBytesWritten = 0;
 
     const interceptedOnOutputEvent = (event: ShellOutputEvent) => {
@@ -381,14 +380,11 @@ export class ShellExecutionService {
         case 'raw_data':
           break;
         case 'file_data':
-          if (!isBinaryStream) {
-            outputStream.write(event.chunk);
-            totalBytesWritten += Buffer.byteLength(event.chunk);
-          }
+          outputStream.write(event.chunk);
+          totalBytesWritten += Buffer.byteLength(event.chunk);
           break;
         case 'binary_detected':
         case 'binary_progress':
-          isBinaryStream = true;
           break;
         default:
           break;
@@ -786,6 +782,24 @@ export class ShellExecutionService {
           }
 
           if (decodedChunk) {
+            const rawEvent: ShellOutputEvent = {
+              type: 'raw_data',
+              chunk: decodedChunk,
+            };
+            onOutputEvent(rawEvent);
+            if (child.pid) {
+              ExecutionLifecycleService.emitEvent(child.pid, rawEvent);
+            }
+
+            const fileEvent: ShellOutputEvent = {
+              type: 'file_data',
+              chunk: stripAnsi(decodedChunk),
+            };
+            onOutputEvent(fileEvent);
+            if (child.pid) {
+              ExecutionLifecycleService.emitEvent(child.pid, fileEvent);
+            }
+
             const event: ShellOutputEvent = {
               type: 'data',
               chunk: decodedChunk,
