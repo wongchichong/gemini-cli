@@ -227,6 +227,7 @@ describe('ShellExecutionService', () => {
       on: vi.fn(),
     });
     ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -1277,6 +1278,8 @@ describe('ShellExecutionService child_process fallback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
 
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -1693,6 +1696,8 @@ describe('ShellExecutionService execution method selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     onOutputEventMock = vi.fn();
 
     // Mock for pty
@@ -1817,6 +1822,8 @@ describe('ShellExecutionService environment variables', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
+    ShellExecutionService.resetForTest();
     vi.resetModules(); // Reset modules to ensure process.env changes are fresh
 
     // Mock for pty
