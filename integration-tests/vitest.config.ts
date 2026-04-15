@@ -8,6 +8,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    hookTimeout: 120000, // 2 minutes for beforeAll
     testTimeout: 300000, // 5 minutes
     globalSetup: './globalSetup.ts',
     reporters: ['default'],

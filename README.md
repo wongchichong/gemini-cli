@@ -120,6 +120,7 @@ npm install -g @google/gemini-cli@nightly
 - Use MCP servers to connect new capabilities, including
   [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Run non-interactively in scripts for workflow automation
+- **Run as OpenAI-compatible API server** for integration with any OpenAI SDK client
 
 ### Advanced Capabilities
 
@@ -254,6 +255,60 @@ use `--output-format stream-json` to get newline-delimited JSON events:
 ```bash
 gemini -p "Run tests and deploy" --output-format stream-json
 ```
+
+#### Server mode (OpenAI-compatible API)
+
+Start Gemini CLI as a daemon server with an OpenAI-compatible REST API:
+
+```bash
+# Start server on default port 3000
+gemini --serve
+
+# Start on custom port
+gemini --serve --serve-port 3030
+
+# Start with API key protection
+gemini --serve --serve-api-key your-secret-key
+```
+
+The server exposes these endpoints:
+- **GET /health** - Health check with uptime and session count
+- **GET /v1/models** - List available models (OpenAI-compatible)
+- **POST /v1/chat/completions** - Chat completions (streaming & non-streaming)
+
+**Use with any OpenAI SDK:**
+
+```javascript
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:3000/v1',
+  apiKey: 'not-needed', // or your --serve-api-key value
+});
+
+const response = await client.chat.completions.create({
+  model: 'gemini',
+  messages: [{ role: 'user', content: 'Explain this codebase' }],
+});
+
+console.log(response.choices[0].message.content);
+```
+
+**Test the server:**
+
+```bash
+# Using npm script
+npm run serve
+npm run test:serve
+
+# Manual testing
+curl http://localhost:3000/health
+curl -X POST http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gemini","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+See [Serve Mode Documentation](/docs/serve-mode.md) for complete API reference.
 
 ### Quick Examples
 

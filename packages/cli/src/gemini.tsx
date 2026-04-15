@@ -625,6 +625,26 @@ export async function main() {
       return runAcpClient(config, settings, argv);
     }
 
+    // Serve mode - start as OpenAI-compatible API server
+    if (argv.serve) {
+      // Remove global signal handlers from setupSignalHandlers()
+      // The server will register its own graceful shutdown handlers
+      process.removeAllListeners('SIGINT');
+      process.removeAllListeners('SIGTERM');
+      process.removeAllListeners('SIGHUP');
+      
+      const { runServer } = await import('./serve/server.js');
+      await config.initialize();
+      startupProfiler.flush(config);
+      
+      await runServer(config, {
+        port: argv.servePort ?? 3000,
+        host: argv.serveHost ?? 'localhost',
+        apiKey: argv.serveApiKey,
+      });
+      return;
+    }
+
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
       isAlternateBufferEnabled(config),

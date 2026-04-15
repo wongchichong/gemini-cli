@@ -68,7 +68,7 @@ import {
 } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
 import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
-import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import type { ExtensionEvents } from '@google/gemini-cli-core';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
@@ -106,6 +106,12 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  
+  // Server mode options
+  serve?: boolean;
+  servePort?: number;
+  serveHost?: string;
+  serveApiKey?: string;
 }
 
 /**
@@ -253,6 +259,15 @@ export async function parseArguments(
       if (argv['worktree'] && !settings.experimental?.worktrees) {
         return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
       }
+      if (argv['serve'] && argv['prompt']) {
+        return 'Cannot use both --serve and --prompt together. Server mode is already non-interactive.';
+      }
+      if (argv['serve'] && argv['promptInteractive']) {
+        return 'Cannot use both --serve and --prompt-interactive together. Server mode is already non-interactive.';
+      }
+      if (argv['serve'] && argv['acp']) {
+        return 'Cannot use both --serve and --acp together. Choose either server mode or ACP mode.';
+      }
       return true;
     });
 
@@ -346,6 +361,26 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'Starts the agent in ACP mode (deprecated, use --acp instead)',
+        })
+        .option('serve', {
+          type: 'boolean',
+          description: 'Start as OpenAI-compatible API server (daemon mode)',
+          default: false,
+        })
+        .option('serve-port', {
+          type: 'number',
+          description: 'Port for API server when using --serve',
+          default: 3000,
+        })
+        .option('serve-host', {
+          type: 'string',
+          description: 'Host for API server when using --serve',
+          default: 'localhost',
+        })
+        .option('serve-api-key', {
+          type: 'string',
+          description: 'API key to protect the /v1/chat/completions endpoint (optional)',
+          hidden: false,
         })
         .option('allowed-mcp-server-names', {
           type: 'array',

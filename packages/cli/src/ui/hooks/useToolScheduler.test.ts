@@ -22,7 +22,7 @@ import {
   CoreToolCallStatus,
   type WaitingToolCall,
 } from '@google/gemini-cli-core';
-import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
+import { createMockMessageBus } from '@google/gemini-cli-core';
 
 // Mock Core Scheduler
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

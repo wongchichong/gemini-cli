@@ -28,6 +28,10 @@ if (!process.cwd().includes('packages')) {
 
 const packageName = basename(process.cwd());
 
+// Determine package manager
+const root = join(process.cwd(), '..', '..');
+const packageManager = existsSync(join(root, 'pnpm-lock.yaml')) ? 'pnpm' : 'npm';
+
 // build typescript files
 execSync('tsc --build', { stdio: 'inherit' });
 
@@ -35,7 +39,7 @@ execSync('tsc --build', { stdio: 'inherit' });
 const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');
 if (packageName === 'core' && existsSync(bundleScript)) {
   console.log('Running chrome devtools MCP bundling...');
-  execSync('npm run bundle:browser-mcp', {
+  execSync(`${packageManager === 'pnpm' ? 'pnpm run' : 'npm run'} bundle:browser-mcp`, {
     stdio: 'inherit',
   });
 }

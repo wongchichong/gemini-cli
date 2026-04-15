@@ -37,7 +37,8 @@ export {
   ExtensionUpdateEvent,
   ModelSlashCommandEvent,
 } from './src/telemetry/types.js';
-export { makeFakeConfig } from './src/test-utils/config.js';
+// Note: makeFakeConfig removed from production export - use in tests only
+// export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';
 export { ClearcutLogger } from './src/telemetry/clearcut-logger/clearcut-logger.js';
 export { logModelSlashCommand } from './src/telemetry/loggers.js';
@@ -48,3 +49,15 @@ export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
 export { ExperimentFlags } from './src/code_assist/experiments/flagNames.js';
 export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';
+
+// Export policy types (used by CLI)
+export { ApprovalMode } from './src/policy/types.js';
+
+// Export extension loader types (used by CLI)
+export type { ExtensionEvents } from './src/utils/extensionLoader.js';
+
+// Export chat recording service (used by CLI)
+export { ChatRecordingService } from './src/services/chatRecordingService.js';
+
+// Note: createMockMessageBus removed from production export - use in tests only
+// export { createMockMessageBus } from './src/test-utils/mock-message-bus.js';
